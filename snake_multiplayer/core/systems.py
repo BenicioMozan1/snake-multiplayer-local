@@ -330,6 +330,8 @@ class World:
     # ─────────────────────────────────────────────────────
 
     def _collision_system(self) -> None:
+        deaths: list[tuple[Snake, str]] = []
+
         for snake in self.snakes.values():
             if not snake.alive:
                 continue
@@ -338,43 +340,35 @@ class World:
 
             # Parede (só se não houver wrap)
             if not C.WRAP_BORDERS:
-                if not (
-                    0 <= col < C.COLS
-                    and 0 <= row < C.ROWS
-                ):
-                    self._kill_snake(snake, "bateu de cabeça na parede")
+                if not (0 <= col < C.COLS and 0 <= row < C.ROWS):
+                    deaths.append((snake, "bateu de cabeça na parede"))
                     continue
 
             # Auto-colisão
             if (col, row) in list(snake.body)[1:]:
-                self._kill_snake(snake, "bateu no próprio corpo")
+                deaths.append((snake, "bateu no próprio corpo"))
                 continue
 
             # Colisão com outras cobras
             if C.COLLISION_MODE == "lethal":
                 for other in self.snakes.values():
-                    if (
-                        other.player_id
-                        == snake.player_id
-                    ):
+                    if other.player_id == snake.player_id:
                         continue
-                    if not other.alive:
-                        continue
-                    if (col, row) in other.body:
-                        self._kill_snake(snake, f"bateu no P{other.player_id}")
+                    
+                    # Checar cabeça com cabeça
+                    if snake.head == other.head:
+                        deaths.append((snake, "bateu de frente com outra cobra"))
+                        break
+                    
+                    # Checar corpo (ignorando a cabeça do outro, já que checamos acima)
+                    if (col, row) in list(other.body)[1:]:
+                        deaths.append((snake, f"bateu no P{other.player_id}"))
                         break
 
-        # Empate: duas cabeças no mesmo ponto
-        alive = [
-            s for s in self.snakes.values() if s.alive
-        ]
-        heads: dict[tuple, list[Snake]] = {}
-        for s in alive:
-            heads.setdefault(s.head, []).append(s)
-        for _pos, group in heads.items():
-            if len(group) > 1:
-                for s in group:
-                    self._kill_snake(s, "bateu de frente com outra cobra")
+        # Aplicar todas as mortes do tick simultaneamente
+        for s, reason in deaths:
+            if s.alive:
+                self._kill_snake(s, reason)
 
     def _kill_snake(self, snake: Snake, reason: str = "") -> None:
         snake.alive = False
@@ -449,10 +443,18 @@ class World:
 
         # Sobrevivência / todos mortos
         if not alive:
-            # Vencedor = maior score
-            best = max(self.scores, key=self.scores.get)
-            self.winner_id = best
-            self.win_reason = "Todos morreram. Vitória por pontos!"
+            # Encontra o maior score e os jogadores empatados
+            max_score = max(self.scores.values())
+            top_players = [
+                pid for pid, score in self.scores.items() if score == max_score
+            ]
+            
+            if len(top_players) > 1:
+                self.winner_id = None
+                self.win_reason = "Empate! Empatados no score máximo."
+            else:
+                self.winner_id = top_players[0]
+                self.win_reason = "Todos morreram. Vitória por pontos!"
             self.game_over = True
         elif (
             len(alive) == 1 and len(self.snakes) > 1

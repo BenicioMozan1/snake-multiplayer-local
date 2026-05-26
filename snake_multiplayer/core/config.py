@@ -60,7 +60,7 @@ WHITE = (235, 235, 245)
 GRAY = (100, 105, 120)
 GRAY_LIGHT = (140, 145, 160)
 COLOR_BG = (18, 18, 24)
-COLOR_DEAD = (80, 35, 40)
+COLOR_DEAD = (255, 100, 100)   # Vermelho mais claro para leitura
 
 # ── Background moderno (elegante light green) ─────────────────
 COLOR_BG_LIGHT = (160, 205, 135)  # gramado claro
