@@ -102,28 +102,35 @@ class World:
     def draw(
         self, surface: pg.Surface, font: pg.font.Font,
     ) -> None:
-        """Port de World.draw() do Asteroids."""
+        """Pipeline visual: fundo → glow → comidas → cobras →
+        faíscas → textos → borda → vinheta."""
+        import core.fx as fx
         from core.utils import (
             draw_border,
-            draw_checkerboard,
             draw_floating_texts,
             draw_food,
             draw_particles,
             draw_snake,
+            draw_snake_glow,
         )
 
-        draw_checkerboard(surface)
-        draw_border(surface)
+        fx.draw_background(surface)
+
+        # Auras luminosas por baixo de tudo.
+        for snake in self.snakes.values():
+            draw_snake_glow(surface, snake)
 
         for food in self.foods:
             draw_food(surface, food)
 
-        draw_particles(surface, self.particles)
-
         for snake in self.snakes.values():
             draw_snake(surface, snake)
 
+        draw_particles(surface, self.particles)
         draw_floating_texts(surface, self.texts, self.font)
+
+        draw_border(surface)
+        fx.draw_vignette(surface)
 
     # ─────────────────────────────────────────────────────
     #  Input

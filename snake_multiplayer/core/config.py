@@ -17,7 +17,7 @@ MAX_SPEED = 20.0
 SPEED_INCREMENT = 0.4          # +0.4/célula comida
 
 # ── Regras de jogo ────────────────────────────────────────────
-FOOD_TO_WIN = 12               # modo corrida
+FOOD_TO_WIN = 40              # modo corrida
 MAX_FOODS_ON_SCREEN = 3
 BONUS_FOOD_CHANCE = 0.15
 BONUS_FOOD_TTL = 8.0
@@ -34,16 +34,18 @@ LEFT = (-1, 0)
 RIGHT = (1, 0)
 OPPOSITE = {UP: DOWN, DOWN: UP, LEFT: RIGHT, RIGHT: LEFT}
 
-# ── Cores dos jogadores (modernas e vibrantes) ────────────────
-SNAKE_P1_COLOR = (130, 120, 255)   # Violeta vibrante
-SNAKE_P2_COLOR = (60, 220, 160)    # Menta
-SNAKE_P3_COLOR = (255, 120, 140)   # Coral
-SNAKE_P4_COLOR = (255, 210, 80)    # Âmbar
+# ── Cores dos jogadores (fofas, vibrantes e bem distintas) ────
+# Cada cobra tem uma cor clara (corpo) e uma escura (gradiente
+# e contorno) para destacar do fundo e não "sumir".
+SNAKE_P1_COLOR = (160, 140, 255)   # Uva neon
+SNAKE_P2_COLOR = (60, 240, 185)    # Esmeralda neon
+SNAKE_P3_COLOR = (255, 120, 165)   # Coral neon
+SNAKE_P4_COLOR = (255, 195, 80)    # Tangerina neon
 
-SNAKE_P1_DARK = (80, 70, 180)
-SNAKE_P2_DARK = (30, 150, 100)
-SNAKE_P3_DARK = (180, 70, 85)
-SNAKE_P4_DARK = (180, 140, 40)
+SNAKE_P1_DARK = (92, 70, 190)
+SNAKE_P2_DARK = (18, 130, 90)
+SNAKE_P3_DARK = (200, 60, 95)
+SNAKE_P4_DARK = (205, 120, 25)
 
 PLAYER_COLORS = [
     SNAKE_P1_COLOR, SNAKE_P2_COLOR,
@@ -56,26 +58,45 @@ PLAYER_DARK = [
 
 # ── Cores gerais ──────────────────────────────────────────────
 BLACK = (0, 0, 0)
-WHITE = (235, 235, 245)
-GRAY = (100, 105, 120)
-GRAY_LIGHT = (140, 145, 160)
-COLOR_BG = (18, 18, 24)
-COLOR_DEAD = (255, 100, 100)   # Vermelho mais claro para leitura
+WHITE = (240, 240, 252)
+GRAY = (150, 150, 175)
+GRAY_LIGHT = (185, 185, 210)
+COLOR_BG = (16, 14, 32)
+COLOR_DEAD = (255, 95, 110)    # Vermelho luminoso para leitura
 
-# ── Background moderno (elegante light green) ─────────────────
-COLOR_BG_LIGHT = (160, 205, 135)  # gramado claro
-COLOR_BG_DARK = (145, 190, 120)   # gramado escuro
-COLOR_BORDER = (80, 110, 60)      # borda da arena
-BORDER_WIDTH = 4                  # pixels
+# ── Tema "Twilight": fundo cósmico em gradiente ───────────────
+# Pontos do gradiente vertical (posição 0..1, cor).
+BG_GRADIENT = [
+    (0.0, (22, 18, 46)),    # topo: índigo profundo
+    (0.55, (38, 24, 60)),   # meio: violeta
+    (1.0, (58, 30, 70)),    # base: ameixa
+]
+GRID_COLOR = (140, 125, 220)   # grade luminosa
+GRID_ALPHA = 26
+VIGNETTE_STRENGTH = 165        # escurecimento das bordas
 
-# ── Lobby ─────────────────────────────────────────────────────
-LOBBY_BG_LIGHT = (140, 185, 115)
-LOBBY_BG_DARK = (130, 175, 105)
+# ── Cores neon de destaque (UI) ───────────────────────────────
+NEON_CYAN = (120, 230, 255)
+NEON_PINK = (255, 120, 200)
+NEON_VIOLET = (170, 140, 255)
 
-# ── Comidas ───────────────────────────────────────────────────
-COLOR_FOOD_NORMAL = (255, 75, 85)
-COLOR_FOOD_BONUS = (255, 200, 50)
-COLOR_FOOD_SPEED = (60, 190, 255)
+# ── Painéis de vidro (glassmorphism) ──────────────────────────
+PANEL_BG = (26, 22, 48)        # base translúcida (alpha aplicado no draw)
+PANEL_ALPHA = 165
+PANEL_BORDER = (140, 125, 225)
+
+# ── Borda da arena ────────────────────────────────────────────
+COLOR_BORDER = (150, 130, 235)
+BORDER_WIDTH = 3
+
+# ── Comidas (maçãs): cor principal + cor escura p/ profundidade
+COLOR_FOOD_NORMAL = (230, 60, 72)   # maçã vermelha
+COLOR_FOOD_BONUS = (255, 196, 54)   # maçã dourada (bônus)
+COLOR_FOOD_SPEED = (74, 184, 240)   # maçã azul (velocidade)
+
+COLOR_FOOD_NORMAL_DARK = (180, 35, 50)
+COLOR_FOOD_BONUS_DARK = (210, 150, 20)
+COLOR_FOOD_SPEED_DARK = (40, 130, 200)
 
 # ── Spawn — 4 cantos ─────────────────────────────────────────
 SNAKE1_START = (COLS // 6, ROWS // 2)

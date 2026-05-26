@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import pygame as pg
 
 import core.config as C
+import core.fx as fx
 from client.hud import HUD
 from core.systems import World
 
@@ -26,6 +27,55 @@ class InputBinding:
 @dataclass
 class Scene:
     name: str
+
+
+# ── Helpers visuais compartilhados (lobby + game over) ────
+def glass_panel(
+    surface: pg.Surface,
+    rect: pg.Rect,
+    border_color: tuple,
+    alpha: int = C.PANEL_ALPHA,
+    radius: int = 16,
+    glow: float = 0.14,
+) -> None:
+    """Painel translúcido com brilho no topo e borda luminosa."""
+    if glow > 0:
+        fx.draw_glow(
+            surface, rect.center,
+            max(rect.w, rect.h) * 0.55, border_color, glow,
+        )
+    panel = pg.Surface((rect.w, rect.h), pg.SRCALPHA)
+    pg.draw.rect(panel, (*C.PANEL_BG, alpha), panel.get_rect(), border_radius=radius)
+    pg.draw.rect(
+        panel, (255, 255, 255, 26),
+        (4, 3, rect.w - 8, rect.h // 2), border_radius=max(2, radius - 2),
+    )
+    pg.draw.rect(
+        panel, (*border_color, 230),
+        panel.get_rect(), width=2, border_radius=radius,
+    )
+    surface.blit(panel, (rect.x, rect.y))
+
+
+def neon_text(
+    surface: pg.Surface,
+    font: pg.font.Font,
+    text: str,
+    center: tuple,
+    color: tuple,
+    glow_alpha: float = 0.55,
+) -> tuple:
+    """Texto branco com halo colorido + contorno neon."""
+    ts = font.render(text, True, C.WHITE)
+    tc = font.render(text, True, color)
+    w, h = ts.get_size()
+    fx.draw_glow(surface, center, max(w, h) * 0.7, color, glow_alpha)
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        c = tc.copy()
+        c.set_alpha(130)
+        surface.blit(c, (center[0] - w // 2 + ox, center[1] - h // 2 + oy))
+    surface.blit(ts, (center[0] - w // 2, center[1] - h // 2))
+    return w, h
 
 
 class Lobby:
@@ -140,137 +190,92 @@ class Lobby:
         self.t += dt
 
     def draw(self, surf: pg.Surface):
-        from core.utils import draw_checkerboard
+        fx.draw_background(surf)
 
-        draw_checkerboard(
-            surf,
-            light=C.LOBBY_BG_LIGHT,
-            dark=C.LOBBY_BG_DARK,
+        # ── Título com glow + pequena flutuação ───────────────
+        bob = int(math.sin(self.t * 2) * 4)
+        neon_text(
+            surf, self.big, "SNAKE",
+            (C.WIDTH // 2, 70 + bob), C.NEON_VIOLET, glow_alpha=0.6,
         )
 
-        # Título Moderno
-        title = self.big.render("SNAKE", True, C.WHITE)
-        surf.blit(
-            title,
-            (C.WIDTH // 2 - title.get_width() // 2, 40),
+        # ── Seletor de modo (pílula de vidro) ─────────────────
+        mode = C.MODES[self.mode_idx]
+        pill = pg.Rect(0, 0, 360, 46)
+        pill.center = (C.WIDTH // 2, 138)
+        glass_panel(surf, pill, C.NEON_CYAN, radius=23, glow=0.18)
+        neon_text(
+            surf, self.medium, f"◀  {mode['label']}  ▶",
+            pill.center, C.NEON_CYAN, glow_alpha=0.0,
         )
+        desc = self.small.render(mode["desc"], True, C.GRAY_LIGHT)
+        surf.blit(desc, (C.WIDTH // 2 - desc.get_width() // 2, 168))
 
-        mode_name = C.MODES[self.mode_idx]["label"]
-        sub = self.medium.render(
-            f"◀  {mode_name}  ▶",
-            True, C.WHITE,
-        )
-        sub_bg = pg.Surface((sub.get_width() + 40, sub.get_height() + 20), pg.SRCALPHA)
-        pg.draw.rect(sub_bg, (30, 30, 40, 200), sub_bg.get_rect(), border_radius=15)
-        surf.blit(sub_bg, (C.WIDTH // 2 - sub_bg.get_width() // 2, 110))
-        surf.blit(
-            sub,
-            (C.WIDTH // 2 - sub.get_width() // 2, 120),
-        )
-
-        # Grid moderno horizontal
-        card_w = 180
-        card_h = 240
-        gap = 30
+        # ── Cards dos jogadores ───────────────────────────────
+        card_w, card_h, gap = 180, 250, 30
         total_w = (card_w * 4) + (gap * 3)
         start_x = (C.WIDTH - total_w) // 2
-        start_y = 220
+        start_y = 210
 
         for i in range(4):
             pid = i + 1
             x = start_x + i * (card_w + gap)
-            y = start_y
             color = self.COLORS[i]
             is_joined = pid in self.bindings
-
-            rect = pg.Rect(x, y, card_w, card_h)
-            
-            # Fundo do card
-            bg_color = (25, 25, 35) if is_joined else (20, 20, 25)
-            pg.draw.rect(surf, bg_color, rect, border_radius=15)
-            
-            # Borda (brilha se joined)
-            border_color = color if is_joined else (40, 40, 50)
-            pg.draw.rect(
-                surf, border_color, rect,
-                3 if is_joined else 2,
-                border_radius=15,
-            )
-
-            # Header do Card (Player Name)
-            header_rect = pg.Rect(x, y, card_w, 50)
-            pg.draw.rect(surf, border_color, header_rect, border_top_left_radius=15, border_top_right_radius=15)
-            
-            lbl_color = C.BLACK if is_joined else C.GRAY
-            lbl = self.medium.render(
-                f"PLAYER {pid}", True, lbl_color,
-            )
-            surf.blit(lbl, (x + card_w//2 - lbl.get_width()//2, y + 10))
+            rect = pg.Rect(x, start_y, card_w, card_h)
 
             if is_joined:
-                b = self.bindings[pid]
-                st = self.small.render(
-                    self._input_label(b), True, C.WHITE,
-                )
+                # Pulso luminoso quando o jogador entrou.
+                pulse = 0.18 + 0.12 * (0.5 + 0.5 * math.sin(self.t * 4 + i))
+                glass_panel(surf, rect, color, glow=pulse)
+                border = color
             else:
-                st = self.small.render(
-                    "Aguardando...", True, C.GRAY,
-                )
-            surf.blit(
-                st,
-                (x + card_w//2 - st.get_width()//2, y + 80),
-            )
+                glass_panel(surf, rect, (70, 66, 95), alpha=120, glow=0.0)
+                border = (90, 86, 120)
 
-            cy = y + 130
+            # Avatar: orbe luminoso na cor do jogador.
+            orb = (rect.centerx, start_y + 56)
             if is_joined:
-                lines = self._control_lines(
-                    self.bindings[pid]
-                )
+                fx.draw_glow(surf, orb, 34, color, 0.6)
+            pg.draw.circle(surf, color if is_joined else (80, 78, 105), orb, 16)
+            pg.draw.circle(surf, C.WHITE, (orb[0] - 5, orb[1] - 5), 4)
+
+            # Nome do jogador.
+            lbl = self.medium.render(f"PLAYER {pid}", True, color if is_joined else C.GRAY)
+            surf.blit(lbl, (rect.centerx - lbl.get_width() // 2, start_y + 92))
+
+            # Status do controle.
+            if is_joined:
+                status = self._input_label(self.bindings[pid])
+                st = self.small.render(status, True, C.WHITE)
             else:
-                lines = [
-                    "Pressione",
-                    "qualquer botão",
-                    "para entrar",
-                ]
+                st = self.small.render("Aguardando...", True, C.GRAY)
+            surf.blit(st, (rect.centerx - st.get_width() // 2, start_y + 130))
+
+            # Linhas de ajuda / controles.
+            if is_joined:
+                lines = self._control_lines(self.bindings[pid])
+            else:
+                lines = ["Pressione", "qualquer botão", "para entrar"]
+            cy = start_y + 165
             for line in lines:
-                txt_color = color if is_joined else C.GRAY
-                s = self.small.render(
-                    line, True, txt_color,
-                )
-                surf.blit(s, (x + card_w//2 - s.get_width()//2, cy))
-                cy += 25
+                s = self.small.render(line, True, color if is_joined else C.GRAY)
+                surf.blit(s, (rect.centerx - s.get_width() // 2, cy))
+                cy += 24
 
-        # Instrução de início pulsante
-        y_bot = C.HEIGHT - 80
+        # ── Chamada para iniciar (pulsante) ───────────────────
+        y_bot = C.HEIGHT - 70
         if self.get_joined_count() >= 2:
-            pulse = int(
-                180 + 75 * math.sin(self.t * 5)
-            )
-            start = self.medium.render(
-                "PRESSIONE START PARA JOGAR",
-                True, (pulse, pulse, pulse),
-            )
-            surf.blit(
-                start,
-                (
-                    C.WIDTH // 2
-                    - start.get_width() // 2,
-                    y_bot,
-                ),
+            glow = 0.4 + 0.3 * (0.5 + 0.5 * math.sin(self.t * 5))
+            neon_text(
+                surf, self.medium, "PRESSIONE START PARA JOGAR",
+                (C.WIDTH // 2, y_bot), C.NEON_PINK, glow_alpha=glow,
             )
         else:
             hint = self.font.render(
-                "Aguardando mínimo de 2 jogadores",
-                True, C.GRAY,
+                "Aguardando mínimo de 2 jogadores", True, C.GRAY_LIGHT,
             )
-            surf.blit(
-                hint,
-                (
-                    C.WIDTH // 2
-                    - hint.get_width() // 2,
-                    y_bot,
-                ),
-            )
+            surf.blit(hint, (C.WIDTH // 2 - hint.get_width() // 2, y_bot - 8))
 
 
 class Game:
@@ -310,6 +315,7 @@ class Game:
         # Game Over state
         self.world: World | None = None
         self.go_fade = 0.0
+        self.confetti: list[dict] = []
 
     def _start_game(self):
         """Aplica modo selecionado e inicia partida."""
@@ -329,137 +335,112 @@ class Game:
         self.scene = Scene("lobby")
         self.world = None
         self.go_fade = 0.0
+        self.confetti = []
+
+    def _spawn_confetti(self, base_color: tuple) -> None:
+        """Cria papéis picados caindo do topo (só na vitória)."""
+        import random
+        palette = [base_color, C.NEON_CYAN, C.NEON_PINK, C.NEON_VIOLET, C.WHITE]
+        self.confetti = [{
+            "x": random.uniform(0, C.WIDTH),
+            "y": random.uniform(-C.HEIGHT, 0),
+            "vy": random.uniform(80, 180),
+            "sway": random.uniform(20, 60),
+            "phase": random.uniform(0, 6.28),
+            "size": random.randint(4, 8),
+            "color": random.choice(palette),
+        } for _ in range(90)]
+
+    def _draw_confetti(self, dt: float) -> None:
+        """Atualiza e desenha o confete."""
+        t = pg.time.get_ticks() / 1000.0
+        for c in self.confetti:
+            c["y"] += c["vy"] * dt
+            x = int(c["x"] + math.sin(t * 2 + c["phase"]) * c["sway"])
+            y = int(c["y"])
+            pg.draw.rect(
+                self.screen, c["color"],
+                (x, y, c["size"], c["size"] + 2), border_radius=2,
+            )
+        # Remove o que saiu pela base.
+        self.confetti = [c for c in self.confetti if c["y"] < C.HEIGHT + 20]
 
     def _draw_game_over(self, dt: float) -> None:
-        """Tela de game over com overlay sobre o grid."""
+        """Tela de vitória: overlay escurecido, confete, card de
+        vidro com glow, título neon e ranking dos jogadores."""
 
         alpha = min(255, int(self.go_fade * 255))
-        overlay = pg.Surface(
-            (C.WIDTH, C.HEIGHT), pg.SRCALPHA,
-        )
-        overlay.fill((10, 10, 15, min(210, alpha))) # Fundo mais escuro
+
+        # Escurece o jogo ao fundo.
+        overlay = pg.Surface((C.WIDTH, C.HEIGHT), pg.SRCALPHA)
+        overlay.fill((8, 6, 18, min(220, alpha)))
         self.screen.blit(overlay, (0, 0))
 
+        # Confete (só quando há vencedor).
+        if self.confetti:
+            self._draw_confetti(dt)
+
         winner_id = self.world.winner_id
-        scores = self.world.scores
 
-        # Card de Game Over
-        card_w, card_h = 560, 480
-        card_x = (C.WIDTH - card_w) // 2
-        card_y = (C.HEIGHT - card_h) // 2
-        
-        card_surface = pg.Surface((card_w, card_h), pg.SRCALPHA)
-        card_surface.set_alpha(alpha)
-        pg.draw.rect(card_surface, (25, 25, 35, 255), (0, 0, card_w, card_h), border_radius=20)
-        pg.draw.rect(card_surface, (50, 50, 60, 255), (0, 0, card_w, card_h), width=2, border_radius=20)
-        
-        self.screen.blit(card_surface, (card_x, card_y))
+        # Card de vidro central.
+        card_w, card_h = 580, 500
+        card = pg.Rect(0, 0, card_w, card_h)
+        card.center = (C.WIDTH // 2, C.HEIGHT // 2)
 
-        # Título
         if winner_id is not None:
-            color = C.PLAYER_COLORS[winner_id - 1]
-            title_surf = self.big.render(
-                "VITÓRIA!", True, color,
-            )
-            winner_text = f"PLAYER {winner_id} VENCEU"
+            accent = C.PLAYER_COLORS[winner_id - 1]
+            title = "VITÓRIA!"
+            subtitle = f"PLAYER {winner_id} VENCEU"
         else:
-            color = C.WHITE
-            title_surf = self.big.render(
-                "EMPATE", True, C.WHITE,
-            )
-            winner_text = "TODOS MORRERAM"
+            accent = C.NEON_CYAN
+            title = "EMPATE"
+            subtitle = "TODOS MORRERAM"
 
-        title_surf.set_alpha(alpha)
-        self.screen.blit(
-            title_surf,
-            (
-                C.WIDTH // 2 - title_surf.get_width() // 2,
-                card_y + 30,
-            ),
-        )
+        glass_panel(self.screen, card, accent, radius=22, glow=0.22)
 
-        w_surf = self.medium.render(
-            winner_text, True, C.WHITE,
-        )
-        w_surf.set_alpha(alpha)
-        self.screen.blit(
-            w_surf,
-            (
-                C.WIDTH // 2 - w_surf.get_width() // 2,
-                card_y + 90,
-            ),
-        )
+        # Título e subtítulo neon.
+        neon_text(self.screen, self.big, title, (card.centerx, card.y + 56), accent)
+        sub = self.medium.render(subtitle, True, C.WHITE)
+        self.screen.blit(sub, (card.centerx - sub.get_width() // 2, card.y + 96))
 
-        # Motivo da vitória
-        reason_surf = self.font.render(
-            self.world.win_reason, True, C.GRAY_LIGHT,
-        )
-        reason_surf.set_alpha(alpha)
-        self.screen.blit(
-            reason_surf,
-            (
-                C.WIDTH // 2 - reason_surf.get_width() // 2,
-                card_y + 120,
-            ),
-        )
+        reason = self.font.render(self.world.win_reason, True, C.GRAY_LIGHT)
+        self.screen.blit(reason, (card.centerx - reason.get_width() // 2, card.y + 128))
 
-        # Resumo de cada jogador
+        # Ranking dos jogadores (ordenado por score).
         sorted_snakes = sorted(
-            self.world.snakes.values(),
-            key=lambda s: s.score,
-            reverse=True,
+            self.world.snakes.values(), key=lambda s: s.score, reverse=True,
         )
-        y = card_y + 170
+        row_w = card_w - 60
+        y = card.y + 168
         for s in sorted_snakes:
-            p_id = s.player_id
-            p_color = C.PLAYER_COLORS[p_id - 1]
-            
-            # Barra do jogador
-            bar_w = 460
-            bar_rect = pg.Rect(C.WIDTH // 2 - bar_w//2, y, bar_w, 40)
-            pg.draw.rect(self.screen, (35, 35, 45, alpha), bar_rect, border_radius=10)
-            
-            s_surf = self.medium.render(
-                f"P{p_id}", True, p_color
+            p_color = C.PLAYER_COLORS[s.player_id - 1]
+            row = pg.Rect(card.centerx - row_w // 2, y, row_w, 44)
+            is_winner = winner_id == s.player_id
+            glass_panel(
+                self.screen, row, p_color if is_winner else (80, 76, 110),
+                alpha=140, radius=12, glow=0.16 if is_winner else 0.0,
             )
-            s_surf.set_alpha(alpha)
-            self.screen.blit(s_surf, (C.WIDTH // 2 - bar_w//2 + 15, y + 5))
-            
-            # Status ou pontuação
+
+            tag = self.medium.render(f"P{s.player_id}", True, p_color)
+            self.screen.blit(tag, (row.x + 16, row.y + 9))
+
             if not s.alive:
-                status_text = s.death_reason
-                status_color = C.COLOR_DEAD
+                status, scolor = s.death_reason, C.COLOR_DEAD
+            elif is_winner:
+                status, scolor = f"Campeão!  {s.score:02d} pts", C.COLOR_FOOD_BONUS
             else:
-                if winner_id == p_id:
-                    status_text = f"Sobrevivente! Score: {s.score:02d}"
-                    status_color = C.COLOR_FOOD_BONUS
-                else:
-                    status_text = f"Score: {s.score:02d}"
-                    status_color = C.WHITE
+                status, scolor = f"{s.score:02d} pts", C.WHITE
+            ssurf = self.font.render(status, True, scolor)
+            self.screen.blit(ssurf, (row.right - ssurf.get_width() - 16, row.y + 13))
+            y += 52
 
-            score_surf = self.font.render(
-                status_text, True, status_color
-            )
-            score_surf.set_alpha(alpha)
-            self.screen.blit(score_surf, (C.WIDTH // 2 + bar_w//2 - score_surf.get_width() - 15, y + 8))
-            
-            y += 50
-
-        # Instrução de reinício (pulsar após fade)
+        # Instrução de reinício (pulsa após o fade).
         if self.go_fade >= 0.8:
-            pulse = int(
-                150 + 105 * math.sin(self.go_fade * 8)
-            )
-            restart = self.medium.render(
-                "START para jogar novamente   |   ESC para voltar",
-                True, (pulse, pulse, pulse),
-            )
-            self.screen.blit(
-                restart,
-                (
-                    C.WIDTH // 2 - restart.get_width() // 2,
-                    C.HEIGHT - 80,
-                ),
+            glow = 0.4 + 0.3 * (0.5 + 0.5 * math.sin(self.go_fade * 6))
+            neon_text(
+                self.screen, self.font,
+                "START para jogar novamente    |    ESC para o lobby",
+                (C.WIDTH // 2, C.HEIGHT - 50), C.NEON_PINK, glow_alpha=glow,
             )
 
     def run(self):
@@ -588,6 +569,10 @@ class Game:
                 if self.world.game_over:
                     self.go_fade = 0.0
                     self.scene = Scene("game_over")
+                    if self.world.winner_id is not None:
+                        self._spawn_confetti(
+                            C.PLAYER_COLORS[self.world.winner_id - 1],
+                        )
 
             elif self.scene.name == "game_over":
                 self.go_fade += dt / (
